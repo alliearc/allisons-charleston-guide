@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#173f3a" />
+  <title>Allison's Charleston Guide</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <style>
+    :root {
+      --ink:#19352f; --green:#173f3a; --sage:#dfe9e4; --cream:#fbf7ef;
+      --gold:#a87d2c; --rose:#a35d58; --coffee:#7d5a43; --line:#ded9ce;
+      --card:#ffffff; --muted:#6c746f;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--cream); font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    header { padding:28px 18px 18px; background:linear-gradient(135deg,#173f3a,#315e56); color:white; }
+    .header-inner { max-width:1180px; margin:auto; }
+    h1 { margin:0; font-family:Georgia,serif; font-size:clamp(2rem,6vw,3.8rem); font-weight:500; letter-spacing:-.03em; }
+    .subtitle { margin:.45rem 0 0; opacity:.92; }
+    .countline { margin-top:14px; font-size:.92rem; opacity:.88; }
+    main { max-width:1180px; margin:auto; padding:16px; }
+    .toolbar { display:grid; gap:10px; margin-bottom:14px; position:sticky; top:0; z-index:900; padding:10px 0; background:rgba(251,247,239,.95); backdrop-filter:blur(8px); }
+    .search { width:100%; padding:13px 15px; border:1px solid var(--line); border-radius:14px; font-size:1rem; background:white; box-shadow:0 4px 18px rgba(20,40,35,.05); }
+    .chips { display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none; }
+    .chip { border:1px solid var(--line); background:white; color:var(--ink); padding:9px 12px; border-radius:999px; white-space:nowrap; font-weight:650; cursor:pointer; }
+    .chip.active { background:var(--green); color:white; border-color:var(--green); }
+    #map { height:48vh; min-height:360px; border-radius:18px; border:1px solid var(--line); box-shadow:0 10px 30px rgba(20,40,35,.08); overflow:hidden; }
+    .summary { display:flex; justify-content:space-between; gap:10px; align-items:center; margin:18px 2px 10px; }
+    .summary h2 { font-family:Georgia,serif; font-weight:500; margin:0; font-size:1.65rem; }
+    #visibleCount { color:var(--muted); font-size:.92rem; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:13px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:15px; box-shadow:0 7px 22px rgba(20,40,35,.055); }
+    .card-top { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+    .card h3 { margin:0; font-size:1.1rem; }
+    .type { font-size:.73rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; border-radius:999px; padding:5px 8px; white-space:nowrap; }
+    .restaurant .type { background:#e4eee9; color:#23534b; }
+    .dessert .type { background:#f6e6e4; color:#884a46; }
+    .coffee .type { background:#eee5dd; color:#6a4a36; }
+    .badges { display:flex; flex-wrap:wrap; gap:6px; margin:9px 0 6px; }
+    .badge { font-size:.78rem; border-radius:999px; padding:5px 8px; background:#f4f2ec; border:1px solid #e7e1d7; }
+    .planned { background:#eef0fa; color:#4a5687; }
+    .skip { background:#f8e8e7; color:#883c38; }
+    .meta { margin-top:7px; color:#47534f; font-size:.91rem; line-height:1.4; }
+    .label { color:var(--muted); font-weight:700; }
+    .rating { letter-spacing:.05em; }
+    .must { margin-top:10px; background:#fff8e6; border-left:4px solid var(--gold); padding:9px 10px; border-radius:7px; font-size:.9rem; }
+    .actions { display:flex; gap:8px; margin-top:13px; }
+    .btn { display:inline-flex; text-decoration:none; align-items:center; justify-content:center; flex:1; border-radius:10px; padding:9px 10px; font-weight:750; font-size:.88rem; }
+    .btn.primary { background:var(--green); color:white; }
+    .btn.secondary { color:var(--green); border:1px solid #b9c9c4; background:white; }
+    footer { max-width:1180px; margin:25px auto 0; padding:22px 18px 34px; color:var(--muted); font-size:.84rem; text-align:center; }
+    .leaflet-popup-content-wrapper { border-radius:14px; }
+    .popup-name { font-weight:800; font-size:1rem; margin-bottom:4px; }
+    @media (min-width:900px) {
+      .toolbar { grid-template-columns:minmax(280px,1fr) 2fr; align-items:center; }
+      #map { height:520px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <h1>Allison's Charleston Guide</h1>
+    <p class="subtitle">Restaurants, sweet stops, and coffee—curated for Charleston trips.</p>
+    <div class="countline">26 restaurants · 9 bakeries & dessert places · 17 coffee shops</div>
+  </div>
+</header>
+
+<main>
+  <section class="toolbar">
+    <input id="search" class="search" type="search" placeholder="Search by name, neighborhood, cuisine, or note…" />
+    <div class="chips" id="chips">
+      <button class="chip active" data-filter="all">All</button>
+      <button class="chip" data-filter="restaurant">🍽 Restaurants</button>
+      <button class="chip" data-filter="dessert">🍰 Dessert</button>
+      <button class="chip" data-filter="coffee">☕ Coffee</button>
+      <button class="chip" data-filter="favorite">⭐ Favorites</button>
+      <button class="chip" data-filter="planned">📅 Planned</button>
+      <button class="chip" data-filter="visited">✅ Been There</button>
+      <button class="chip" data-filter="returnSoon">🔁 Return Soon</button>
+    </div>
+  </section>
+
+  <div id="map"></div>
+  <div id="mapStatus" style="margin:8px 2px 0;color:#6c746f;font-size:.88rem">Loading map pins…</div>
+
+  <div class="summary">
+    <h2>Places</h2>
+    <div id="visibleCount"></div>
+  </div>
+  <section id="cards" class="grid"></section>
+</main>
+
+<footer>Updated July 2026 · Your public link stays the same whenever this file is replaced on GitHub.</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+const places = [{"name": "82 Queen", "address": "82 Queen St.", "locale": "Downtown", "hood": "French Quarter", "hours": "11-5 Daily       Brunch SAT-SUN", "specialties": "southern cuisine", "meal": "Yes", "website": "https://82queen.com/", "status": "🚫", "rating": "⭐⭐", "mustOrder": "", "category": "restaurant", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": true}, {"name": "Allora", "address": "114 Spring St.", "locale": "Downtown", "hood": "Cannonborough/ Elliotborough", "hours": "11-10 Daily", "specialties": "Coastal Italian", "meal": "Yes", "website": "https://www.allorachs.com/", "status": "lunch on 8/24", "rating": "", "mustOrder": "", "category": "restaurant", "planned": true, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Cane Pazzo", "address": "1276 Yeamans Hall Rd.", "locale": "Hanahan", "hood": "", "hours": "5-10 M-SA", "specialties": "Italian; New & Notable", "meal": "No", "website": "https://canepazzorestaurant.com/", "status": "Dinner on 8/25", "rating": "", "mustOrder": "", "category": "restaurant", "planned": true, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Chez Nous", "address": "6 Payne Ct.", "locale": "Downtown", "hood": "Cannonborough/ Elliotborough", "hours": "11:30-3                5-10                TU-SUN", "specialties": "2 apps, 2 entrees, 2 desserts (menu changes daily)", "meal": "Yes", "website": "https://www.cheznouschs.com/", "status": "⭐🔁", "rating": "⭐⭐⭐⭐⭐", "mustOrder": "salted honey ice cream (or any ice cream dessert option)", "category": "restaurant", "planned": false, "visited": false, "favorite": true, "returnSoon": true, "skip": false}, {"name": "Ellis Creek Fish Camp", "address": "1243 Harbor View Rd.", "locale": "James Island", "hood": "", "hours": "11-9 Daily *no reservations*", "specialties": "casual - order from a window and they bring food out", "meal": "Yes", "website": "https://elliscreekfishcamp.com/", "status": "", "rating": "", "mustOrder": "", "category": "restaurant", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "FIG", "address": "Meeting St.", "locale": "Downtown", "hood": "Ansonborough", "hours": "5-10:30  TU-SAT", "specialties": "Michelin recommended", "meal": "No", "website": "https://eatatfig.com/", "status": "⭐", "rating": "⭐⭐⭐⭐⭐", "mustOrder": "gnocchi; sticky sorghum pudding", "category": "restaurant", "planned": false, "visited": false, "favorite": true, "returnSoon": false, "skip": false}, {"name": "Hall's Chophouse", "address": "434 King St.", "locale": "Downtown", "hood": "Upper King", "hours": "4-11 Daily        11-11 SAT-SUN", "specialties": "Steakhouse", "meal": "No", "website": "https://hallschophousecharleston.com/", "status": "✅🚫", "rating": "⭐⭐⭐", "mustOrder": "creamed corn skillet", "category": "restaurant", "planned": false, "visited": true, "favorite": false, "returnSoon": false, "skip": true}, {"name": "Honeysuckle Rose", "address": "237 Fishburne St.", "locale": "Downtown", "hood": "Cannonborough/ Elliotborough", "hours": "6-9 TU-TH   7-10 FRI-SAT", "specialties": "8-course chef's tasting menu                     $250/pp;                       tips included;                 3-hour meal", "meal": "No", "website": "https://www.honeysucklerosechs.com/", "status": "", "rating": "", "mustOrder": "", "category": "restaurant", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "HUSK", "address": "Queen St.", "locale": "Downtown", "hood": "Historic Downtown", "hours": "5-10 Daily     Brunch SAT-SUN", "specialties": "Michelin recommended", "meal": "No", "website": "https://huskrestaurant.com/", "status": "✅🚫", "rating": "⭐⭐", "mustOrder": "", "category": "restaurant", "planned": false, "visited": true, "favorite": false, "returnSoon": false, "skip": true}, {"name": "Indaco", "address": "526 King St.", "locale": "Downtown", "hood": "Cannonborough/ Elliotborough", "hours": "5-10 Daily   10-2:30 SAT-SUN", "specialties": "Italian Food & Wine", "meal": "No", "website": "https://www.indacorestaurant.com/location/indaco-charleston/", "status": "", "rating": "", "mustOrder": "", "category": "restaurant", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Lost Isle", "address": "3338 Maybank Hwy", "locale": "Johns Island", "hood": "", "hours": "4-10 Daily", "specialties": "backyard oasis vibe; open-air wood-fired", "meal": "No", "website": "https://www.lostislechs.com/", "status": "", "rating": "", "mustOrder": "", "category": "restaurant", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Lou Lou's Tavern", "address": "1640 Meeting St.", "locale": "Downtown", "hood": "Upper Peninsula              (in The Refinery)", "hours": "4-10 TUES-FRI  11-9 SAT-SUN", "specialties": "small plates & shareables; cheeses", "meal": "No", "website": "https://www.louloustavern.com/", "status": "", "rating": "", "mustOrder": "", "category": "restaurant", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Lowland", "address": "36 George St.", "locale": "Downtown", "hood": "Elliotborough            \"The Pinch\" Hotel", "hours": "5-10 Daily", "specialties": "Michelin recommended  *Owner is previous FIG chef", "meal": "No", "website": "https://www.thepinch.com/lowland", "status": "Dinner on 8/24?", "rating": "", "mustOrder": "", "category": "restaurant", "planned": true, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Magnolia's", "address": "185 E. Bay St.", "locale": "Downtown", "hood": "French Quarter", "hours": "11:30-3:30     4-9 Daily", "specialties": "southern cuisine", "meal": "Yes", "website": "https://magnoliascharleston.com/", "status": "", "rating": "", "mustOrder": "", "category": "restaurant", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Malagon", "address": "33 Spring St.", "locale": "Downtown", "hood": "Cannonborough/ Elliotborough", "hours": "11-10 TU-SU", "specialties": "Michelin star", "meal": "Yes", "website": "https://www.malagonchs.com/", "status": "lunch on 8/25 or 8/26?", "rating": "", "mustOrder": "", "category": "restaurant", "planned": true, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Marbled & Fin", "address": "480 East Bay St.", "locale": "Downtown", "hood": "Ansonborough", "hours": "5-10 Daily          10-2 SAT-SUN", "specialties": "Steak & Seafood; *very good!", "meal": "No", "website": "https://marbledandfin.com/", "status": "⭐🔁", "rating": "⭐⭐⭐⭐⭐", "mustOrder": "", "category": "restaurant", "planned": false, "visited": false, "favorite": true, "returnSoon": true, "skip": false}, {"name": "Merci", "address": "28 Pitt St.", "locale": "Downtown", "hood": "Harleston Village", "hours": "4-10 W-SA", "specialties": "Beef Wellington for 2. Scott's too fussy for this place", "meal": "No", "website": "https://www.mercichs.com/", "status": "", "rating": "", "mustOrder": "", "category": "restaurant", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "OK Donna", "address": "1117 King St.", "locale": "Downtown", "hood": "Wagener Terrace", "hours": "5-12 WED-MON", "specialties": "Italian & cool drinks", "meal": "No", "website": "https://ok-donna.com/", "status": "", "rating": "", "mustOrder": "", "category": "restaurant", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Peninsula Grill", "address": "112 N. Market St.", "locale": "Downtown", "hood": "in Historic District,        at Planters' Inn", "hours": "5-9 Daily      7A-11A MON-SAT    9-1 SUN", "specialties": "Delish filet mignon; award-winning coconut cake (just ok)", "meal": "No", "website": "https://peninsulagrill.com/", "status": "✅", "rating": "⭐⭐⭐⭐⭐", "mustOrder": "filet mignon", "category": "restaurant", "planned": false, "visited": true, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Sorelle", "address": "88 Broad St.", "locale": "Downtown", "hood": "French Quarter", "hours": "5-10 Daily    10-2 SUN     8-4 Daily (Mercato)", "specialties": "Italian; cute balcony seating for two upon request; Michelin recommended", "meal": "No", "website": "https://www.sorellecharleston.com/", "status": "✅", "rating": "⭐⭐⭐⭐", "mustOrder": "", "category": "restaurant", "planned": false, "visited": true, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Sorghum & Salt", "address": "186 St. Philip St.", "locale": "Downtown", "hood": "Cannonborough/ Elliotborough", "hours": "5-10 TU-SUN", "specialties": "Vegan; Chef's Counter; Artistic & Unique Presentation", "meal": "No", "website": "", "status": "✅🚫", "rating": "⭐⭐⭐", "mustOrder": "dessert with fermented blueberries", "category": "restaurant", "planned": false, "visited": true, "favorite": false, "returnSoon": false, "skip": true}, {"name": "The Obstinate Daughter", "address": "2063 Middle St.", "locale": "Sullivan's Island", "hood": "", "hours": "11-3 Daily         4-10 Daily", "specialties": "Michelin star", "meal": "Yes", "website": "https://www.theobstinatedaughter.com/", "status": "✅", "rating": "⭐⭐⭐⭐", "mustOrder": "Radiatore pasta a la vodka; ANY dessert", "category": "restaurant", "planned": false, "visited": true, "favorite": false, "returnSoon": false, "skip": false}, {"name": "The Royal Tern", "address": "3005 Maybank Hwy", "locale": "Johns Island", "hood": "", "hours": "5-9 M-SA", "specialties": "SEAFOOD; great desserts", "meal": "No", "website": "https://www.theroyaltern.com/", "status": "", "rating": "", "mustOrder": "", "category": "restaurant", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Vern's", "address": "41 Bogard St", "locale": "Downtown", "hood": "Cannonborough/ Elliotborough", "hours": "5-10 TH-M", "specialties": "Michelin star", "meal": "No", "website": "https://www.vernschs.com/", "status": "Dinner on 8/27?", "rating": "", "mustOrder": "", "category": "restaurant", "planned": true, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Wild Common", "address": "103 Spring St. Left Side", "locale": "Downtown", "hood": "Cannonborough/ Elliotborough", "hours": "6-11 TU-SU", "specialties": "Michelin star;                     chef's counter seating", "meal": "No", "website": "https://www.wildcommoncharleston.com/", "status": "Dinner on 8/26?", "rating": "", "mustOrder": "", "category": "restaurant", "planned": true, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Zero George", "address": "0 George St.", "locale": "Downtown", "hood": "Ansonborough", "hours": "5:30-8:30 TU-SU", "specialties": "Michelin recommended; cooking classes", "meal": "No", "website": "https://zerogeorge.com/zero-restaurant-bar/", "status": "", "rating": "", "mustOrder": "", "category": "restaurant", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Welton's Tiny Bake Shop", "address": "684 King St.", "locale": "Downtown", "hood": "Upper King/North Central Westside/NoMo", "hours": "8-1 Daily", "specialties": "STUNNING pastries", "meal": "", "website": "https://www.weltonstinybakeshop.com/", "status": "", "rating": "", "mustOrder": "", "category": "dessert", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Annie Mae's Bake Shop", "address": "185 Philip St.", "locale": "Downtown", "hood": "Cannonborough-Elliotborough", "hours": "W-SU 8-2", "specialties": "Pastries, cakes, pies & creative lattes", "meal": "", "website": "https://www.anniemaesbakeshop.com", "status": "✅", "rating": "", "mustOrder": "", "category": "dessert", "planned": false, "visited": true, "favorite": false, "returnSoon": false, "skip": false}, {"name": "La Patisserie", "address": "404 King St. (Hotel Bennett)", "locale": "Downtown", "hood": "Upper King/ Cannonborough-Elliotborough", "hours": "M-SU 7AM-8PM", "specialties": "All Desserts/ James Beard nominated pastry chef", "meal": "", "website": "https://www.hotelbennett.com/dining-and-lounges/la-patisserie", "status": "", "rating": "", "mustOrder": "", "category": "dessert", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Normandy Farm Artisan Bakery", "address": "32 Windermere Blvd.", "locale": "West Ashley (close to James Island)", "hood": "South Windermere", "hours": "M-SA 7-2; SU 8-2", "specialties": "breakfast, baked goods, sandwiches", "meal": "Breakfast", "website": "", "status": "", "rating": "", "mustOrder": "", "category": "dessert", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "BKeDSHoP", "address": "99 Westedge St.", "locale": "Downtown", "hood": "Westside", "hours": "M-F 7-4; Sat-Sun 8-4", "specialties": "insane lattes and giant  square donuts with everything on them!", "meal": "", "website": "https://www.eatbkedshop.com", "status": "", "rating": "", "mustOrder": "", "category": "dessert", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Wild Flour Pastry", "address": "1750 Savannah Hwy", "locale": "West Ashley", "hood": "Ardmore/ Sherwood Forest", "hours": "M-F 6:30-3; Sat 8-3; Sun 8-1", "specialties": "Every pastry, cake and cookie you can imagine; breakfast stuff too", "meal": "Breakfast", "website": "https://wildflourpastry.com", "status": "", "rating": "", "mustOrder": "", "category": "dessert", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Girl Nextdough", "address": "1939 Maybank Hwy", "locale": "James Island", "hood": "Riverland Terrace", "hours": "TH-SU 8-12", "specialties": "Donuts & Bagels (former pastry chef from FIG)", "meal": "", "website": "", "status": "", "rating": "", "mustOrder": "", "category": "dessert", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Caviar & Bananas", "address": "51 George St.", "locale": "Downtown", "hood": "Harleston Village", "hours": "8-3:30 Daily", "specialties": "breakfast, baked goods, sandwiches", "meal": "Breakfast (till 12)", "website": "https://www.caviarandbananas.com/", "status": "", "rating": "", "mustOrder": "", "category": "dessert", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Roxa Dessert Bar", "address": "1296 Yeamans Hall Rd.", "locale": "Hanahan", "hood": "", "hours": "W-SA 5-10               SU 4-8", "specialties": "desserts!  chef's counter", "meal": "", "website": "https://roxadesserts.com/", "status": "", "rating": "", "mustOrder": "", "category": "dessert", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Harlow & Pearl", "address": "769 Meeting St.", "locale": "Downtown", "hood": "Eastside/North Central", "hours": "8-3 Daily", "specialties": "Lattes (Fun ones!)", "meal": "", "website": "https://www.instagram.com/harlowandpearl/", "status": "", "rating": "", "mustOrder": "", "category": "coffee", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Bloom & Bean", "address": "1421 Shucker Circle", "locale": "Mt. Pleasant", "hood": "", "hours": "7AM-6 PM Daily", "specialties": "Lattes & some food", "meal": "", "website": "https://www.instagram.com/bloomandbeancoffee/", "status": "", "rating": "", "mustOrder": "", "category": "coffee", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Babas on Wentworth", "address": "115 Wentworth St.", "locale": "Downtown", "hood": "Harleston Village", "hours": "7AM-8 PM TU-TH; 7AM-10 PM FR-SA; 7AM-6 PM SUN", "specialties": "Lattes, Pastries, Toasts", "meal": "", "website": "https://babascharleston.com/", "status": "", "rating": "", "mustOrder": "", "category": "coffee", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Luma", "address": "128 Columbus St.", "locale": "Downtown", "hood": "Radcliffeborough", "hours": "\"all day\"", "specialties": "New! Breakfast & Lattes", "meal": "", "website": "https://lumacharleston.com/", "status": "", "rating": "", "mustOrder": "", "category": "coffee", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Caviar & Bananas", "address": "51 George St.", "locale": "Downtown", "hood": "Harleston Village", "hours": "6 pm Daily", "specialties": "Coffees & Ice Cream", "meal": "", "website": "https://www.caviarandbananas.com/", "status": "", "rating": "", "mustOrder": "", "category": "coffee", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Bad Bunnies", "address": "116A Spring St.", "locale": "Downtown", "hood": "Cannonborough/ Elliotborough", "hours": "8-2 M-SA", "specialties": "Lattes & Coffees", "meal": "", "website": "https://www.badbunniescoffee.com/", "status": "", "rating": "", "mustOrder": "", "category": "coffee", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Bitty & Beau's", "address": "159 Church St.", "locale": "Downtown", "hood": "French Quarter", "hours": "9-5 Daily", "specialties": "Coffees", "meal": "", "website": "https://www.bittyandbeauscoffee.com/location/charleston/", "status": "", "rating": "", "mustOrder": "", "category": "coffee", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Harken Cafe", "address": "62 Queen St.", "locale": "Downtown", "hood": "French Quarter", "hours": "8-4 M-SA        8-1 SU", "specialties": "Breakfast & Lattes;        few lunch items", "meal": "", "website": "https://www.harkencafe.com/", "status": "✅", "rating": "", "mustOrder": "", "category": "coffee", "planned": false, "visited": true, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Cooper Coffee & Wine Bar", "address": "178 Concord St.", "locale": "Downtown", "hood": "Marina", "hours": "7-4 Daily", "specialties": "Breakfast & Lattes", "meal": "", "website": "https://www.thecooper.com/dining/", "status": "", "rating": "", "mustOrder": "", "category": "coffee", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Second State Coffee", "address": "70.5 Beaufain St.", "locale": "Downtown", "hood": "Harleston Village", "hours": "7-5 Daily", "specialties": "Lattes & Coffees", "meal": "", "website": "https://secondstatecoffee.com/", "status": "", "rating": "", "mustOrder": "", "category": "coffee", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Harbinger Cafe", "address": "1107 King St.", "locale": "Downtown", "hood": "Wagener Terrace", "hours": "8-3 M-SA      8-1 SU", "specialties": "Breakfast & Lattes", "meal": "", "website": "https://www.theharbingercafe.com/", "status": "", "rating": "", "mustOrder": "", "category": "coffee", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Sorelle Mercato", "address": "88 Broad St.", "locale": "Downtown", "hood": "French Quarter", "hours": "8-4 Daily (Mercato)", "specialties": "Breakfast, Lunch & Lattes", "meal": "", "website": "https://www.sorellecharleston.com/", "status": "✅", "rating": "", "mustOrder": "", "category": "coffee", "planned": false, "visited": true, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Black Door Cafe", "address": "115 Meeting St.", "locale": "Downtown", "hood": "French Quarter", "hours": "6:30 AM - 8 PM", "specialties": "Lattes", "meal": "", "website": "https://www.millshouse.com/dine/black-door-cafe/", "status": "✅", "rating": "", "mustOrder": "", "category": "coffee", "planned": false, "visited": true, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Clerk's", "address": "181 Church St.", "locale": "Downtown", "hood": "Ansonborough/ Hotel Emeline", "hours": "7-4 Daily", "specialties": "Lattes & Pastries", "meal": "", "website": "https://Clerk's", "status": "✅", "rating": "", "mustOrder": "", "category": "coffee", "planned": false, "visited": true, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Muddy Waters", "address": "1739 Maybank Hwy", "locale": "James Island", "hood": "", "hours": "7-6 Daily", "specialties": "Lattes & Coffees", "meal": "", "website": "https://www.muddywaterscoffee.com/", "status": "", "rating": "", "mustOrder": "", "category": "coffee", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "Kudu", "address": "4 Vanderhorst St.", "locale": "Downtown", "hood": "Radcliffeborough", "hours": "7 AM - 8 PM Daily", "specialties": "MANY AMAZING LATTES!", "meal": "", "website": "https://www.kuducharleston.com/", "status": "", "rating": "", "mustOrder": "", "category": "coffee", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}, {"name": "City Lights Eastside", "address": "12 Line Str", "locale": "Downtown", "hood": "Eastside", "hours": "8-4 Daily", "specialties": "Breakfast & Lattes", "meal": "", "website": "https://citylightseastside0542.s4shops.com/", "status": "", "rating": "", "mustOrder": "", "category": "coffee", "planned": false, "visited": false, "favorite": false, "returnSoon": false, "skip": false}];
+const categoryNames = {restaurant:"Restaurant", dessert:"Bakery / Dessert", coffee:"Coffee"};
+const categoryIcons = {restaurant:"🍽", dessert:"🍰", coffee:"☕"};
+let activeFilter = "all";
+let query = "";
+const markers = [];
+const markerByName = new Map();
+
+const map = L.map('map', {scrollWheelZoom:false}).setView([32.7876,-79.9403], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom:19, attribution:'&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+function pinIcon(category) {
+  const bg = category === "restaurant" ? "#173f3a" : category === "dessert" ? "#a35d58" : "#7d5a43";
+  return L.divIcon({
+    className:"",
+    html:`<div style="width:32px;height:32px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${bg};border:2px solid white;box-shadow:0 2px 7px #0004;display:grid;place-items:center"><span style="transform:rotate(45deg);font-size:15px">${categoryIcons[category]}</span></div>`,
+    iconSize:[32,32], iconAnchor:[16,32], popupAnchor:[0,-31]
+  });
+}
+
+function matches(p) {
+  const blob = [p.name,p.address,p.locale,p.hood,p.hours,p.specialties,p.status,p.rating,p.mustOrder].join(" ").toLowerCase();
+  const textOK = !query || blob.includes(query);
+  let filterOK = true;
+  if (["restaurant","dessert","coffee"].includes(activeFilter)) filterOK = p.category === activeFilter;
+  else if (activeFilter === "favorite") filterOK = p.favorite;
+  else if (activeFilter === "planned") filterOK = p.planned;
+  else if (activeFilter === "visited") filterOK = p.visited;
+  else if (activeFilter === "returnSoon") filterOK = p.returnSoon;
+  return textOK && filterOK;
+}
+
+function badges(p) {
+  const b = [];
+  if (p.favorite) b.push('<span class="badge">⭐ Favorite</span>');
+  if (p.returnSoon) b.push('<span class="badge">🔁 Return Soon</span>');
+  if (p.visited) b.push('<span class="badge">✅ Been There</span>');
+  if (p.skip) b.push('<span class="badge skip">🚫 Don’t Need to Return</span>');
+  if (p.planned) b.push(`<span class="badge planned">📅 ${escapeHTML(p.status)}</span>`);
+  return b.join("");
+}
+
+function escapeHTML(s) {
+  return String(s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function cardHTML(p) {
+  const directions = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([p.name,p.address,p.locale,"SC"].filter(Boolean).join(", "))}`;
+  return `<article class="card ${p.category}">
+    <div class="card-top">
+      <h3>${escapeHTML(p.name)}</h3>
+      <span class="type">${categoryNames[p.category]}</span>
+    </div>
+    <div class="badges">${badges(p)}</div>
+    ${p.rating ? `<div class="meta rating"><span class="label">Allison rating:</span> ${escapeHTML(p.rating)}</div>` : ""}
+    <div class="meta"><span class="label">Where:</span> ${escapeHTML([p.address,p.hood,p.locale].filter(Boolean).join(" · "))}</div>
+    ${p.hours ? `<div class="meta"><span class="label">Hours:</span> ${escapeHTML(p.hours)}</div>` : ""}
+    ${p.specialties ? `<div class="meta"><span class="label">Known for:</span> ${escapeHTML(p.specialties)}</div>` : ""}
+    ${p.meal ? `<div class="meta"><span class="label">Meal note:</span> ${escapeHTML(p.meal)}</div>` : ""}
+    ${p.mustOrder ? `<div class="must"><strong>Must order:</strong> ${escapeHTML(p.mustOrder)}</div>` : ""}
+    <div class="actions">
+      <a class="btn primary" href="${directions}" target="_blank" rel="noopener">Directions</a>
+      ${p.website ? `<a class="btn secondary" href="${escapeHTML(p.website)}" target="_blank" rel="noopener">Website</a>` : ""}
+    </div>
+  </article>`;
+}
+
+function render() {
+  const visible = places.filter(matches);
+  document.getElementById("cards").innerHTML = visible.map(cardHTML).join("");
+  document.getElementById("visibleCount").textContent = `${visible.length} shown`;
+  markers.forEach(m => map.removeLayer(m));
+  markers.length = 0;
+  for (const p of visible) {
+    const marker = markerByName.get(p.name);
+    if (marker) { marker.addTo(map); markers.push(marker); }
+  }
+  if (markers.length) {
+    const group = L.featureGroup(markers);
+    map.fitBounds(group.getBounds().pad(.12), {maxZoom:14});
+  }
+}
+
+document.getElementById("search").addEventListener("input", e => {
+  query = e.target.value.trim().toLowerCase();
+  render();
+});
+document.getElementById("chips").addEventListener("click", e => {
+  const btn = e.target.closest(".chip");
+  if (!btn) return;
+  document.querySelectorAll(".chip").forEach(x => x.classList.remove("active"));
+  btn.classList.add("active");
+  activeFilter = btn.dataset.filter;
+  render();
+});
+
+async function geocodeAll() {
+  const statusEl = document.getElementById("mapStatus");
+  let geocodedCount = 0;
+  const cacheKey = "allison-charleston-geocodes-v4";
+  let cache = {};
+  try { cache = JSON.parse(localStorage.getItem(cacheKey) || "{}"); } catch(e) {}
+  for (const p of places) {
+    const key = [p.name,p.address,p.locale].join("|");
+    let loc = cache[key];
+    if (!loc) {
+      const q = [p.name, p.address, (p.locale && p.locale.toLowerCase().includes("hanahan")) ? "Hanahan" : (p.locale && p.locale.toLowerCase().includes("mount pleasant")) ? "Mount Pleasant" : (p.locale && p.locale.toLowerCase().includes("sullivan")) ? "Sullivan’s Island" : (p.locale && p.locale.toLowerCase().includes("johns island")) ? "Johns Island" : (p.locale && p.locale.toLowerCase().includes("james island")) ? "James Island" : (p.locale && p.locale.toLowerCase().includes("west ashley")) ? "Charleston" : "Charleston", "South Carolina"].filter(Boolean).join(", ");
+      try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`, {
+          headers: {"Accept-Language":"en"}
+        });
+        const result = await response.json();
+        if (result[0]) {
+          loc = [Number(result[0].lat), Number(result[0].lon)];
+          cache[key] = loc;
+          localStorage.setItem(cacheKey, JSON.stringify(cache));
+        }
+      } catch(e) {}
+      await new Promise(r => setTimeout(r, 1050));
+    }
+    if (loc) {
+      geocodedCount += 1;
+      if (statusEl) statusEl.textContent = `Loading map pins… ${geocodedCount} of ${places.length}`;
+      const marker = L.marker(loc, {icon:pinIcon(p.category)});
+      marker.bindPopup(`<div class="popup-name">${escapeHTML(p.name)}</div><div>${categoryNames[p.category]}</div>${p.rating ? `<div>${escapeHTML(p.rating)}</div>`:""}`);
+      markerByName.set(p.name, marker);
+      if (matches(p)) { marker.addTo(map); markers.push(marker); }
+    }
+  }
+  if (markers.length) map.fitBounds(L.featureGroup(markers).getBounds().pad(.12), {maxZoom:14});
+  if (statusEl) statusEl.textContent = geocodedCount ? `${geocodedCount} map pins loaded` : "Map pins could not be loaded. The place list below is still available.";
+}
+
+render();
+geocodeAll();
+</script>
+</body>
+</html>
