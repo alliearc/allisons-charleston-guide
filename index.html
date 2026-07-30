@@ -53,6 +53,9 @@
     footer { max-width:1180px; margin:25px auto 0; padding:22px 18px 34px; color:var(--muted); font-size:.84rem; text-align:center; }
     .leaflet-popup-content-wrapper { border-radius:14px; }
     .popup-name { font-weight:800; font-size:1rem; margin-bottom:4px; }
+    .progress { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 14px; }
+    .progress-pill { background:white; border:1px solid var(--line); border-radius:999px; padding:8px 11px; font-size:.86rem; box-shadow:0 4px 14px rgba(20,40,35,.04); }
+    #backToTop { position:fixed; right:18px; bottom:18px; z-index:1000; width:44px; height:44px; border:0; border-radius:50%; background:var(--green); color:white; font-size:20px; box-shadow:0 8px 24px rgba(20,40,35,.25); cursor:pointer; display:none; }
     @media (min-width:900px) {
       .toolbar { grid-template-columns:minmax(280px,1fr) 2fr; align-items:center; }
       #map { height:520px; }
@@ -83,6 +86,7 @@
     </div>
   </section>
 
+  <div id="progress" class="progress"></div>
   <div id="map"></div>
   <div id="mapStatus" style="margin:8px 2px 0;color:#6c746f;font-size:.88rem">Loading map pins…</div>
 
@@ -92,6 +96,7 @@
   </div>
   <section id="cards" class="grid"></section>
 </main>
+<button id="backToTop" aria-label="Back to top">↑</button>
 
 <footer>Updated July 30, 2026 · Your public link stays the same whenever this file is replaced on GitHub.</footer>
 
@@ -147,6 +152,23 @@ function escapeHTML(s) {
   return String(s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
 
+function cleanText(s) {
+  return String(s || "").replace(/\s+/g, " ").trim();
+}
+
+function updateProgress() {
+  const cats = [
+    ["restaurant","🍽 Restaurants"],
+    ["dessert","🍰 Bakeries & dessert"],
+    ["coffee","☕ Coffee shops"]
+  ];
+  document.getElementById("progress").innerHTML = cats.map(([cat,label]) => {
+    const list = places.filter(p => p.category === cat);
+    const tried = list.filter(p => p.visited).length;
+    return `<span class="progress-pill"><strong>${label}:</strong> ${tried} of ${list.length} tried</span>`;
+  }).join("");
+}
+
 function cardHTML(p) {
   const directions = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([p.name,p.address,p.locale,"SC"].filter(Boolean).join(", "))}`;
   return `<article class="card ${p.category}">
@@ -156,11 +178,10 @@ function cardHTML(p) {
     </div>
     <div class="badges">${badges(p)}</div>
     ${p.rating ? `<div class="meta rating"><span class="label">Allison rating:</span> ${escapeHTML(p.rating)}</div>` : ""}
-    <div class="meta"><span class="label">Where:</span> ${escapeHTML([p.address,p.hood,p.locale].filter(Boolean).join(" · "))}</div>
-    ${p.hours ? `<div class="meta"><span class="label">Hours:</span> ${escapeHTML(p.hours)}</div>` : ""}
-    ${p.specialties ? `<div class="meta"><span class="label">Known for:</span> ${escapeHTML(p.specialties)}</div>` : ""}
-    ${p.meal ? `<div class="meta"><span class="label">Meal note:</span> ${escapeHTML(p.meal)}</div>` : ""}
-    ${p.mustOrder ? `<div class="must"><strong>Must order:</strong> ${escapeHTML(p.mustOrder)}</div>` : ""}
+    <div class="meta"><span class="label">Where:</span> ${escapeHTML(cleanText([p.address,p.hood,p.locale].filter(Boolean).join(" · ")))}</div>
+    ${p.hours ? `<div class="meta"><span class="label">Hours:</span> ${escapeHTML(cleanText(p.hours))}</div>` : ""}
+    ${p.specialties ? `<div class="meta"><span class="label">Known for:</span> ${escapeHTML(cleanText(p.specialties))}</div>` : ""}
+    ${p.mustOrder ? `<div class="must"><strong>Must order:</strong> ${escapeHTML(cleanText(p.mustOrder))}</div>` : ""}
     <div class="actions">
       <a class="btn primary" href="${directions}" target="_blank" rel="noopener">Directions</a>
       ${p.website ? `<a class="btn secondary" href="${escapeHTML(p.website)}" target="_blank" rel="noopener">Website</a>` : ""}
@@ -213,8 +234,13 @@ function loadFixedPins() {
   if (statusEl) statusEl.textContent = `${count} map pins loaded`;
 }
 
+updateProgress();
 render();
 loadFixedPins();
+
+const backToTop = document.getElementById("backToTop");
+window.addEventListener("scroll", () => { backToTop.style.display = window.scrollY > 700 ? "block" : "none"; });
+backToTop.addEventListener("click", () => window.scrollTo({top:0, behavior:"smooth"}));
 </script>
 </body>
 </html>
